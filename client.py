@@ -5,10 +5,13 @@ from threading import Thread
 from sound_lib import stream, output
 from accessible_output2 import outputs
 import sys
+import re
 
 class Program(wx.Frame):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
+		self.output=output.Output()
+		self.soundStyle=r"\((.*?)\)"
 		self.host=wx.GetTextFromUser("Digite o endereço do MUD", "client", "mud.fantasticmud.com")
 		try:
 			self.port=int(wx.GetTextFromUser("Digite a porta do mud", "Client", "4000"))
@@ -30,6 +33,7 @@ class Program(wx.Frame):
 	def connect(self):
 		try:
 			self.telnet=Telnet(self.host, self.port)
+			self.outputBox.AppendText("Conectado")
 			while True:
 				message=self.telnet.read_very_eager()
 				wx.CallAfter(self.parseMessage, message)
@@ -38,16 +42,34 @@ class Program(wx.Frame):
 
 	def parseMessage(self, message):
 		message=message.decode("iso-8859-1")
-		message=message.strip()
-		if not message=="":
-			speak(message)
-			self.outputBox.AppendText(message)
+		lines=message.split("\n")
+		for line in lines:
+			line=line.strip()
+			if not line=="":
+				if line.lower().startswith("!!sound"):
+					parsedLine=re.search(self.soundStyle, line)
+					params=parsedLine.group(1).split(" ")
+					file=params[0]
+					volume=100
+					volume=int(params[1].split("=")[1])
+					self.playSound(file)
+				else:
+					speak(line)
+					position=self.outputBox.GetInsertionPoint()
+					self.outputBox.AppendText("\r\n"+line)
+					self.outputBox.SetInsertionPoint(position)
 
 	def sendMessage(self, event):
 		message=self.inputBox.GetValue()+"\n"
 		message=message.encode("iso-8859-1")
 		self.telnet.write(message)
 		self.inputBox.Clear()
+
+	def playSound(self, file):
+		if not file=="off":
+			self.stream=stream.FileStream(file="sounds/"+file)
+		else:
+			self.stream.stop()
 
 if __name__=="__main__":
 	app=wx.App(False)
