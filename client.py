@@ -1,8 +1,7 @@
 import wx
-import telnetlib3
+from telnetlib import Telnet
 import threading
 from threading import Thread
-import asyncio
 from sound_lib import stream, output
 from accessible_output2 import outputs
 import sys
@@ -10,8 +9,6 @@ import sys
 class Program(wx.Frame):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
-		self.reader=None
-		self.writer=None
 		self.host=wx.GetTextFromUser("Digite o endereço do MUD", "client", "mud.fantasticmud.com")
 		try:
 			self.port=int(wx.GetTextFromUser("Digite a porta do mud", "Client", "4000"))
@@ -27,32 +24,21 @@ class Program(wx.Frame):
 		labelOutputBox=wx.StaticText(panel, label="&Saída")
 		self.outputBox=wx.TextCtrl(panel, style=wx.TE_MULTILINE|wx.TE_READONLY|wx.TE_DONTWRAP)
 		self.inputBox.Bind(wx.EVT_TEXT_ENTER, self.sendMessage)
-		Thread(target=self.startConnection, daemon=True).start()
+		Thread(target=self.connect, daemon=True).start()
 		self.Show()
 
-	def startConnection(self):
-		asyncio.run(self.connect())
-
-	async def connect(self):
+	def connect(self):
 		try:
-			self.reader, self.writer=await telnetlib3.open_connection(host=self.host, port=self.port, encoding=None)
-			buffer=b""
+			self.telnet=Telnet(self.host, self.port)
 			while True:
-				message=await self.reader.read(1024)
-				buffer+=message
-				while b"\n" in buffer:
-					line, buffer=buffer.split(b"\n", 1)
-					text=line.decode("iso-8859-1")+"\n"
-					wx.CallAfter(self.parseMessage, text)
-				if buffer:
-					text=buffer.decode("iso-8859-1")
-					wx.CallAfter(self.parseMessage, text)
-					buffer=b""
-
+				message=self.telnet.read_very_eager()
+				wx.CallAfter(self.parseMessage, message)
 		except Exception as e:
 			wx.MessageBox(f"Erro: {e}", "erro", wx.ICON_ERROR)
 
 	def parseMessage(self, message):
+		message=message.decode("iso-8859-1")
+		message=message.strip()
 		if not message=="":
 			speak(message)
 			self.outputBox.AppendText(message)
@@ -60,7 +46,7 @@ class Program(wx.Frame):
 	def sendMessage(self, event):
 		message=self.inputBox.GetValue()+"\n"
 		message=message.encode("iso-8859-1")
-		self.writer.write(message)
+		self.telnet.write(message)
 		self.inputBox.Clear()
 
 if __name__=="__main__":
