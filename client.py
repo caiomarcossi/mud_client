@@ -68,6 +68,7 @@ class Program(wx.Frame):
 	def playSound(self, file):
 		if not file=="off":
 			self.stream=stream.FileStream(file="sounds/"+file)
+			self.stream.play()
 		else:
 			self.stream.stop()
 
