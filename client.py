@@ -8,6 +8,9 @@ import sys
 import re
 import os
 from time import sleep
+import accessibility as ACC
+from savedata import savedata
+import math
 
 class Program(wx.Frame):
 	def __init__(self, *args, **kwargs):
@@ -46,7 +49,6 @@ class Program(wx.Frame):
 	def connect(self):
 		try:
 			self.telnet=Telnet(self.host, self.port)
-			wx.CallAfter(self.outputBox.AppendText, "Conectado")
 			while True:
 				message=self.telnet.read_very_eager()
 				if message:
@@ -67,7 +69,7 @@ class Program(wx.Frame):
 					file=params[0]
 					try:
 						volume=int(params[1].split("=")[1])
-						volume=volume/100
+						volume=self.normalizeVolume(volume)
 					except:
 						volume=1.0
 					self.playSound(file, volume)
@@ -77,7 +79,7 @@ class Program(wx.Frame):
 					file=params[0]
 					try:
 						volume=int(params[1].split("=")[1])
-						volume=volume/100
+						volume=self.normalizeVolume(volume)
 					except:
 						volume=1.0
 					self.playSound(file, volume, True)
@@ -85,10 +87,18 @@ class Program(wx.Frame):
 					speak(line)
 					if self.outputBox.HasFocus():
 						position=self.outputBox.GetInsertionPoint()
-						self.outputBox.AppendText("\r\n"+line)
+						self.outputBox.AppendText(line+"\r\n")
 						self.outputBox.SetInsertionPoint(position)
 					else:
-						self.outputBox.AppendText("\r\n"+line)
+						self.outputBox.AppendText(line+"\r\n")
+
+	def normalizeVolume(self, volume):
+		if volume<=0:
+			return 0.0
+		elif volume>=100:
+			return 1.0
+
+		return round(math.pow(10, (volume-100)/60), 4)
 
 	def sendMessage(self, event):
 		message=self.inputBox.GetValue()+"\n"

@@ -1,4 +1,5 @@
 import wx
+import wx.adv
 
 class AccessibleFrame(wx.Accessible):
 	def GetRole(self, childId):
