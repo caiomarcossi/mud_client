@@ -11,6 +11,7 @@ from time import sleep
 import accessibility as ACC
 from savedata import savedata
 import math
+import textwrap
 
 class Program(wx.Frame):
 	def __init__(self, *args, **kwargs):
@@ -60,6 +61,7 @@ class Program(wx.Frame):
 	def parseMessage(self, message):
 		message=message.decode("iso-8859-1")
 		lines=message.split("\n")
+		lines=[wrappedLine for line in lines for wrappedLine in textwrap.wrap(line, width=256, break_long_words=False)]
 		for line in lines:
 			line=line.strip()
 			if not line=="":
