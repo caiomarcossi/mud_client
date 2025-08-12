@@ -1,6 +1,5 @@
 import wx
 from telnetlib import Telnet
-import threading
 from threading import Thread
 from sound_lib import stream, output
 from accessible_output2 import outputs
@@ -8,10 +7,11 @@ import sys
 import re
 import os
 from time import sleep
-import accessibility as ACC
-from savedata import savedata
 import math
 import textwrap
+import accessibility as ACC
+from savedata import savedata
+import error_handler
 
 class Program(wx.Frame):
 	def __init__(self, *args, **kwargs):
@@ -19,6 +19,8 @@ class Program(wx.Frame):
 		self.output=output.Output()
 		self.soundStyle=r"\((.*?)\)"
 		self.streams=[]
+		self.history=[]
+		self.historyIndex=0
 		self.host=wx.GetTextFromUser("Digite o endereço do MUD", "client", "mud.fantasticmud.com")
 		try:
 			self.port=int(wx.GetTextFromUser("Digite a porta do mud", "Client", "4000"))
@@ -29,11 +31,23 @@ class Program(wx.Frame):
 
 	def initUI(self):
 		panel=wx.Panel(self)
+		mainSizer=wx.BoxSizer(wx.VERTICAL)
 		labelInputBox=wx.StaticText(panel, label="&Entrada")
 		self.inputBox=wx.TextCtrl(panel, style=wx.TE_MULTILINE|wx.TE_DONTWRAP|wx.TE_PROCESS_ENTER)
+		box1=wx.BoxSizer(wx.HORIZONTAL)
+		box1.Add(labelInputBox, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5)
+		box1.Add(self.inputBox, 1, wx.EXPAND)
 		labelOutputBox=wx.StaticText(panel, label="&Saída")
 		self.outputBox=wx.TextCtrl(panel, style=wx.TE_MULTILINE|wx.TE_READONLY|wx.TE_DONTWRAP)
+		box2=wx.BoxSizer(wx.HORIZONTAL)
+		box2.Add(labelOutputBox, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5)
+		box2.Add(self.outputBox, 1, wx.EXPAND)
+		mainSizer.Add(box1, 1, wx.ALL|wx.EXPAND, 5)
+		mainSizer.Add(box2, 1, wx.ALL|wx.EXPAND, 5)
+		panel.SetSizer(mainSizer)
+		self.Fit()
 		self.inputBox.Bind(wx.EVT_TEXT_ENTER, self.sendMessage)
+		self.inputBox.Bind(wx.EVT_KEY_DOWN, self.verifyInputBoxKeys)
 		self.outputBox.Bind(wx.EVT_CHAR, self.verifyKey)
 		Thread(target=self.connect, daemon=True).start()
 		self.Show()
@@ -47,6 +61,33 @@ class Program(wx.Frame):
 			self.inputBox.WriteText(char)
 		else:
 			event.Skip()
+
+	def verifyInputBoxKeys(self, event):
+		keymod=event.GetModifiers()
+		code=event.GetKeyCode()
+		shiftDown=keymod and wx.MOD_SHIFT
+		ctrlDown=keymod and wx.MOD_CONTROL
+		altDown=keymod and wx.MOD_ALT
+		if code==wx.WXK_UP:
+			if self.historyIndex>0:
+				self.historyIndex-=1
+				self.inputBox.Clear()
+				self.inputBox.WriteText(self.history[self.historyIndex])
+				self.inputBox.SetSelection(-1, -1)
+		elif code==wx.WXK_DOWN:
+			if self.historyIndex<len(self.history)-1:
+				self.historyIndex+=1
+				self.inputBox.Clear()
+				self.inputBox.WriteText(self.history[self.historyIndex])
+				self.inputBox.SetSelection(-1, -1)
+			else:
+				self.inputBox.Clear()
+				self.historyIndex=len(self.history)
+		elif shiftDown and code==wx.WXK_RETURN:
+			self.sendMessage(addToHistory=False)
+		else:
+			event.Skip()
+
 	def connect(self):
 		try:
 			self.telnet=Telnet(self.host, self.port)
@@ -102,11 +143,18 @@ class Program(wx.Frame):
 
 		return round(math.pow(10, (volume-100)/60), 4)
 
-	def sendMessage(self, event):
-		message=self.inputBox.GetValue()+"\n"
-		message=message.encode("iso-8859-1")
-		self.telnet.write(message)
-		self.inputBox.Clear()
+	def sendMessage(self, event=None, addToHistory=True):
+		entireMessage=self.inputBox.GetValue()
+		messages=entireMessage.split(";")
+		for message in messages:
+			if addToHistory and self.historyIndex==len(self.history):
+				self.history.append(message)
+			self.historyIndex=len(self.history)
+			message=message+"\n"
+			message=message.encode("iso-8859-1")
+			self.telnet.write(message)
+		if addToHistory:
+			self.inputBox.Clear()
 
 	def playSound(self, file, volume=1.0, music=False):
 		self.streams=[stream for stream in self.streams if stream.is_playing]
