@@ -18,6 +18,7 @@ class Program(wx.Frame):
 		super().__init__(*args, **kwargs)
 		self.output=output.Output()
 		self.soundStyle=r"\((.*?)\)"
+		self.ansi_style=re.compile(rb"\x1B\[[0-?]*[ -/]*[@-~]")
 		self.streams=[]
 		self.history=[]
 		self.historyIndex=0
@@ -100,7 +101,7 @@ class Program(wx.Frame):
 			wx.MessageBox(f"Erro: {e}", "erro", wx.ICON_ERROR)
 
 	def parseMessage(self, message):
-		message=message.decode("iso-8859-1")
+		message=self.ansi_style.sub(b"", message).decode("iso-8859-1")
 		lines=message.split("\n")
 		lines=[wrappedLine for line in lines for wrappedLine in textwrap.wrap(line, width=256, break_long_words=False)]
 		for line in lines:
@@ -173,7 +174,7 @@ class Program(wx.Frame):
 				self.musicStream.volume=volume
 				self.musicStream.play()
 			except:
-				wx.MessageBox(f"Erro ao reproduzir a música {file}.", "erro", wx.ICON_ERROR)
+				return
 		else:
 			if file=="sounds/off":
 				if hasattr(self, "musicStream") and self.musicStream.is_playing:
@@ -193,4 +194,5 @@ if __name__=="__main__":
 	app=wx.App(False)
 	speak=outputs.auto.Auto().speak
 	program=Program(None, title="Mud Client")
+	program.SetAccessible(ACC.AccessibleFrame())
 	app.MainLoop()
