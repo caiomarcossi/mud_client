@@ -98,7 +98,11 @@ class Program(wx.Frame):
 					wx.CallAfter(self.parseMessage, message)
 				sleep(0.005)
 		except Exception as e:
-			wx.MessageBox(f"Erro: {e}", "erro", wx.ICON_ERROR)
+			result=wx.MessageBox(f"Erro na conexão: {e}. Você gostaria de tentar reconectar?", "Erro", style=wx.YES_NO|wx.ICON_ERROR)
+			if result==wx.YES:
+				Thread(target=self.connect, daemon=True).start()
+			else:
+				self.Close()
 
 	def parseMessage(self, message):
 		message=self.ansi_style.sub(b"", message).decode("iso-8859-1")
